@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  invariants:
+    name: consolidation invariants (CPU, no model download)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU deps
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch keeps CI light; bitsandbytes is intentionally omitted
+          # (GPU-only and gated in evaluate.py).
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "transformers==4.43.3" "numpy==1.26.4" pytest
+
+      - name: Compile all modules
+        run: python -m py_compile model.py data.py distill.py evaluate.py plot.py run_sweep.py
+
+      - name: Run consolidation invariant tests
+        run: pytest -q tests/test_consolidation.py
