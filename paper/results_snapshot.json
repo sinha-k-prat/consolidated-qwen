@@ -1,0 +1,64 @@
+{
+  "_note": "Frontier sweep snapshot, Qwen1.5-0.5B, 300 optimizer steps/rank, Colab T4. quantized_4bit ppl not obtained (bitsandbytes failed to load under the pinned stack); only a size estimate is recorded.",
+  "teacher": {
+    "ppl": 22.946822776185495,
+    "size_gb": 0.927975424,
+    "params": 463987712
+  },
+  "quantized_4bit_estimate": {
+    "size_gb": 0.465553408,
+    "params": 463987712
+  },
+  "consolidated_rank4": {
+    "ppl": 609.6468343399122,
+    "size_gb": 0.340887552,
+    "params": 170443776,
+    "rank": 4,
+    "breakdown": {
+      "frozen_shared_params": 155632640,
+      "backbone_params": 12845056,
+      "adapter_params": 1892352,
+      "bias_params": 73728,
+      "tie_word_embeddings": true
+    }
+  },
+  "consolidated_rank8": {
+    "ppl": 578.0397286582919,
+    "size_gb": 0.344672256,
+    "params": 172336128,
+    "rank": 8,
+    "breakdown": {
+      "frozen_shared_params": 155632640,
+      "backbone_params": 12845056,
+      "adapter_params": 3784704,
+      "bias_params": 73728,
+      "tie_word_embeddings": true
+    }
+  },
+  "consolidated_rank16": {
+    "ppl": 559.8408248915699,
+    "size_gb": 0.352241664,
+    "params": 176120832,
+    "rank": 16,
+    "breakdown": {
+      "frozen_shared_params": 155632640,
+      "backbone_params": 12845056,
+      "adapter_params": 7569408,
+      "bias_params": 73728,
+      "tie_word_embeddings": true
+    }
+  },
+  "consolidated_rank32": {
+    "ppl": 535.5527232739307,
+    "size_gb": 0.36738048,
+    "params": 183690240,
+    "rank": 32,
+    "breakdown": {
+      "frozen_shared_params": 155632640,
+      "backbone_params": 12845056,
+      "adapter_params": 15138816,
+      "bias_params": 73728,
+      "tie_word_embeddings": true
+    }
+  }
+}

@@ -4,6 +4,11 @@
 compressor and not a SOTA run. Step counts are deliberately tiny so a full rank
 sweep finishes in ~2 hours on a Colab T4.
 
+> 📄 **Write-up:** [`paper/findings.md`](paper/findings.md) — methods, the
+> frontier results, and the headline finding (attention q/k are the most
+> layer-specific; the MLP is the most shareable; the tied-embedding block
+> dominates size). **Next steps:** [`NEXT_STEPS.md`](NEXT_STEPS.md).
+
 ## Hypothesis
 
 A pretrained **Qwen1.5-0.5B** is the frozen *teacher*. We build a *student* with

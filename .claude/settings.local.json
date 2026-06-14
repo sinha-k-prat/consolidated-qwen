@@ -15,7 +15,8 @@
       "Bash(python -m py_compile distill.py evaluate.py distill_v2.py)",
       "Bash(python -m py_compile hub.py)",
       "Bash(python -m py_compile infer.py)",
-      "Bash(python -m py_compile class_spread.py)"
+      "Bash(python -m py_compile class_spread.py)",
+      "Bash(python -c \"import json; json.load\\(open\\('paper/results_snapshot.json'\\)\\); print\\('snapshot json ok'\\)\")"
     ]
   }
 }
