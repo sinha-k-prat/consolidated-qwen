@@ -64,6 +64,12 @@ states at decoder layers **8 and 16** (intermediate representation anchors).
 
 ## Run locally
 
+> **Python 3.10+ required for the pinned versions.** `requirements.txt` targets
+> the Colab runtime (`torch==2.3.1`, which has no Python 3.8/3.9 wheels). On an
+> older base env, create a fresh one first:
+> `conda create -n consol python=3.11 -y && conda activate consol`.
+> (CI runs these exact tests on Python 3.11.)
+
 ```bash
 pip install -r requirements.txt
 

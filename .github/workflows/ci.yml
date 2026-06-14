@@ -27,4 +27,5 @@ jobs:
         run: python -m py_compile model.py data.py distill.py evaluate.py plot.py run_sweep.py
 
       - name: Run consolidation invariant tests
-        run: pytest -q tests/test_consolidation.py
+        # `python -m pytest` puts the repo root on sys.path so `import model` resolves.
+        run: python -m pytest -q tests/test_consolidation.py
