@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile model.py compare_ce.py divergence.py model_v2.py distill_v2.py plot_spread.py)",
+      "Bash(python -m pytest -q tests/test_consolidation.py)",
+      "Bash(python -c \"import json; json.load\\(open\\('notebook.ipynb'\\)\\); print\\('notebook JSON ok'\\)\")",
+      "Bash(python -m py_compile model.py distill.py run_sweep.py compare_ce.py divergence.py)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

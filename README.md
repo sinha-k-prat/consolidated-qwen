@@ -112,6 +112,75 @@ size. `evaluate.py` reads `config.tie_word_embeddings` and counts the V×H block
 budget, so it is read from config, and the full per-category breakdown is printed
 and stored in `results.json` under each consolidated entry.
 
+## Post-hoc analysis (V1)
+
+After a sweep produces a checkpoint (e.g. `checkpoints/student_rank8.pt`):
+
+**Held-out CE — `compare_ce.py`.** Per-sequence cross-entropy on N held-out
+sequences (wikitext-2 test, default 100) for the **teacher** vs the
+**consolidated student**, reported as raw CE (+ ppl) with the mean gap and a
+per-sequence breakdown to `ce_compare.json`. It also **verifies** the structural
+claim: every class's 24 layers reference the *same* backbone tensor (by id) — so
+the same-class weights are literally identical, not approximately.
+
+```bash
+python compare_ce.py --checkpoint checkpoints/student_rank8.pt --num-seqs 100
+```
+
+**Per-layer divergence — `divergence.py`.** How far each layer's effective
+weight sits from its class's shared mean. In V1 that divergence *is* the adapter
+delta `scale·A@B`, so this reads it straight from the adapters and writes
+`divergence.json` + a 24×7 heatmap `divergence.png` (rows = layers, cols =
+classes, color = `||delta|| / ||backbone||`). Bright cells = layers/classes that
+resist sharing (the adapter is working hard); uniformly dim classes are the best
+consolidation candidates.
+
+```bash
+python divergence.py --checkpoint checkpoints/student_rank8.pt
+```
+
+## V2 — convergence measurement (`model_v2.py`, `distill_v2.py`, `plot_spread.py`)
+
+V1 *imposes* a shared backbone and asks "does quality survive?". V2 instead
+**measures whether same-class layers actually want to converge**, rather than
+assuming it. It keeps every layer's **full** per-layer weight trainable (no
+shared backbone), adds the same per-layer rank-r adapters, and adds an
+**annealed consolidation penalty** `lambda(t) * sum_c mean_i ||W_i - mean_c||^2`
+that ramps from 0 and pulls each class's 24 matrices toward their running mean.
+Weights start at the teacher's actual values (not the mean) so we can watch them
+*travel*.
+
+It logs **per-class spread** (mean L2 distance from the class mean) every
+`--spread-every` steps to `spread_history.json`; `plot_spread.py` renders
+`spread.png`.
+
+```bash
+python distill_v2.py --smoke-test                 # verify pipeline (10 steps)
+python distill_v2.py --fp16 --max-lambda 1.0      # real run
+python plot_spread.py                             # -> spread.png
+```
+
+Reading `spread.png`:
+
+- **Spread collapses toward zero** while KD loss stays low → layers genuinely
+  converge; V1's structural sharing is justified. (win condition)
+- **Spread drops then plateaus** → converges partway; the plateau height is the
+  irreducible per-layer identity at that rank — the answer to "how far does it
+  reach".
+- **Spread barely moves / KD explodes as lambda rises** → layers resist sharing
+  at this rank; needs bigger adapters.
+- **Per-class differences** → which classes collapse (likely `v_proj`/`o_proj`)
+  vs resist (likely the MLP matrices) tells you to share selectively.
+
+The experiment: sweep `--max-lambda` over `[0.1, 1.0, 10.0]` at fixed rank and
+plot final spread vs lambda alongside final perplexity — that traces how hard
+convergence can be pushed before quality breaks.
+
+**Caveats:** V2 holds all 24×7 full weights trainable, so it uses far more memory
+than V1 (tight on a T4 — use smaller batch or gradient checkpointing), and the
+per-step penalty over all stacked matrices makes it slower per step. Smoke-test
+first.
+
 ## Limitations / future ablations
 
 - Proof-of-concept step counts; not tuned for best quality.

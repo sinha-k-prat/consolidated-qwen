@@ -100,6 +100,26 @@ def test_gradients_reach_backbone():
     assert cl.B.grad is not None
 
 
+def test_divergence_zero_at_init():
+    """B == 0 so every per-layer divergence from the shared mean is exactly 0."""
+    m = build()
+    div = m.divergence_from_mean()
+    for cls in WEIGHT_CLASSES:
+        assert len(div[cls]["abs"]) == m.num_layers
+        assert all(v == 0.0 for v in div[cls]["abs"])
+        assert all(v == 0.0 for v in div[cls]["rel"])
+
+
+def test_divergence_tracks_active_adapter():
+    """Activating one layer's adapter shows up as divergence on that layer only."""
+    m = build()
+    cl = m._get_linear(m.base.model.layers[0], "q_proj")
+    cl.B.data.fill_(0.1)
+    div = m.divergence_from_mean()
+    assert div["q_proj"]["abs"][0] > 0.0          # layer 0 now diverges
+    assert div["q_proj"]["abs"][1] == 0.0         # others untouched
+
+
 def test_param_groups_split_and_lr():
     m = build()
     groups = m.param_groups(base_lr=1e-3, backbone_lr_mult=0.1)

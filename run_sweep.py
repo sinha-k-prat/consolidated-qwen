@@ -56,8 +56,10 @@ def build_argparser():
     ap = argparse.ArgumentParser(description="Rank sweep orchestrator.")
     ap.add_argument("--model-name", default="Qwen/Qwen1.5-0.5B")
     ap.add_argument("--ranks", type=int, nargs="+", default=[4, 8, 16, 32])
-    ap.add_argument("--steps", type=int, default=300)
-    ap.add_argument("--warmup-backbone-steps", type=int, default=200)
+    ap.add_argument("--steps", type=int, default=300,
+                    help="OPTIMIZER steps per rank (real weight updates)")
+    ap.add_argument("--warmup-backbone-steps", type=int, default=150,
+                    help="freeze backbone (optimizer steps), adapters only")
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--batch-size", type=int, default=2)
     ap.add_argument("--grad-accum", type=int, default=8)

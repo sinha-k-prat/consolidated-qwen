@@ -104,10 +104,11 @@ class ConsolidatedLinear(nn.Module):
             self.register_parameter("bias", None)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Recompute the effective weight every forward. The delta is a cheap
-        # (out, r) @ (r, in) matmul for small r. backbone/A/B share dtype+device.
-        delta = self.scale * (self.A @ self.B)        # (out, in)
-        weight = self.backbone + delta
+        # Compute the low-rank delta in fp32 for numerical stability (small A,
+        # scale=alpha/r can underflow in fp16), then cast back to the weight
+        # dtype before the linear. backbone/A/B share device; dtype may differ.
+        delta = self.scale * (self.A.float() @ self.B.float())   # fp32
+        weight = self.backbone + delta.to(self.backbone.dtype)
         return F.linear(x, weight, self.bias)
 
     def extra_repr(self) -> str:
@@ -227,6 +228,33 @@ class ConsolidatedQwen(nn.Module):
 
     def num_trainable(self) -> int:
         return sum(p.numel() for p in self.trainable_parameters())
+
+    @torch.no_grad()
+    def divergence_from_mean(self):
+        """How far each layer's effective weight sits from the shared backbone
+        (the consolidated per-class 'mean'), per layer and per class.
+
+        Effective weight = backbone + scale*(A@B). Since the backbone IS the one
+        shared/mean component, the per-layer divergence is exactly the adapter
+        delta. (This is the V1 analog of V2's per-class spread metric, but read
+        from the adapters instead of from separate per-layer weights.)
+
+        Returns { class: {"abs": [L floats], "rel": [L floats]} } where
+        abs = ||delta_i||_F  and  rel = ||delta_i||_F / ||backbone||_F.
+        """
+        out = {}
+        for cls in WEIGHT_CLASSES:
+            backbone = self.backbones[cls]
+            bnorm = backbone.float().norm().item()
+            abs_list, rel_list = [], []
+            for layer in self.base.model.layers:
+                cl = self._get_linear(layer, cls)
+                delta = cl.scale * (cl.A.float() @ cl.B.float())
+                dn = delta.norm().item()
+                abs_list.append(dn)
+                rel_list.append(dn / (bnorm + 1e-12))
+            out[cls] = {"abs": abs_list, "rel": rel_list}
+        return out
 
     def consolidated_state_dict(self) -> dict:
         """Only the cheap learned tensors (backbones + adapters + biases).
