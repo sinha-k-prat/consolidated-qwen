@@ -8,7 +8,10 @@
       "Bash(git add *)",
       "Bash(git commit -q -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(python -m py_compile hub.py infer.py)",
+      "Bash(python infer.py --help)",
+      "Bash(python hub.py --help)"
     ]
   }
 }

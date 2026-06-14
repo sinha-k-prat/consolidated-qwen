@@ -24,7 +24,7 @@ jobs:
           pip install "transformers==4.43.3" "numpy==1.26.4" pytest
 
       - name: Compile all modules
-        run: python -m py_compile model.py data.py distill.py evaluate.py plot.py run_sweep.py
+        run: python -m py_compile model.py data.py distill.py evaluate.py plot.py run_sweep.py compare_ce.py divergence.py hub.py infer.py model_v2.py distill_v2.py plot_spread.py
 
       - name: Run consolidation invariant tests
         # `python -m pytest` puts the repo root on sys.path so `import model` resolves.

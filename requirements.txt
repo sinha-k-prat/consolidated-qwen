@@ -4,6 +4,8 @@ torch==2.3.1
 transformers==4.43.3
 datasets==2.20.0
 accelerate==0.33.0
+# huggingface-hub: push/pull the consolidated weights (hub.py / infer.py).
+huggingface-hub==0.24.5
 # bitsandbytes provides the 4-bit (nf4) baseline. GPU-only; evaluate.py gates
 # the import so CPU-only machines (e.g. local smoke tests) don't crash.
 bitsandbytes==0.43.1
