@@ -21,3 +21,6 @@ wandb/
 
 # os
 .DS_Store
+
+# local Claude Code settings
+.claude/
