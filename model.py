@@ -122,10 +122,16 @@ class ConsolidatedQwen(nn.Module):
 
     def __init__(self, model_name: str = "Qwen/Qwen1.5-0.5B",
                  rank: int = 8, alpha: float = 16.0,
-                 dtype: torch.dtype = torch.float32):
+                 dtype: torch.dtype = torch.float32,
+                 base_model: nn.Module | None = None):
         super().__init__()
-        self.base = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=dtype)
+        # `base_model` lets tests inject a tiny random Qwen2 so CI can check the
+        # consolidation invariants without downloading the 1 GB checkpoint.
+        if base_model is not None:
+            self.base = base_model
+        else:
+            self.base = AutoModelForCausalLM.from_pretrained(
+                model_name, torch_dtype=dtype)
         self.config = self.base.config
         self.rank = rank
         self.alpha = alpha
