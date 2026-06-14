@@ -59,6 +59,10 @@ Research prototype — https://github.com/sinha-k-prat/consolidated-qwen
 def push(checkpoint, repo_id, private=False, token=None):
     ckpt = torch.load(checkpoint, map_location="cpu")
     api = HfApi(token=token)
+    # If only a repo name was given (no "user/"), put it under YOUR namespace.
+    # This avoids 401s from accidentally targeting someone else's username.
+    if "/" not in repo_id:
+        repo_id = f"{api.whoami()['name']}/{repo_id}"
     api.create_repo(repo_id, repo_type="model", private=private, exist_ok=True)
     api.upload_file(path_or_fileobj=checkpoint, path_in_repo=CKPT_FILENAME,
                     repo_id=repo_id, repo_type="model")

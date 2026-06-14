@@ -12,7 +12,8 @@
       "Bash(python -m py_compile hub.py infer.py)",
       "Bash(python infer.py --help)",
       "Bash(python hub.py --help)",
-      "Bash(python -m py_compile distill.py evaluate.py distill_v2.py)"
+      "Bash(python -m py_compile distill.py evaluate.py distill_v2.py)",
+      "Bash(python -m py_compile hub.py)"
     ]
   }
 }
