@@ -31,7 +31,9 @@ def lambda_schedule(opt_step, total, max_lambda, warmup_frac=0.3):
 
 def train(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16 if (args.fp16 and device == "cuda") else torch.float32
+    # fp32 master weights; --fp16 enables autocast + GradScaler (see distill.py).
+    amp = bool(args.fp16 and device == "cuda")
+    dtype = torch.float32
     tok = AutoTokenizer.from_pretrained(args.model_name)
 
     teacher = AutoModelForCausalLM.from_pretrained(
@@ -51,6 +53,7 @@ def train(args):
 
     optim = torch.optim.AdamW(student.trainable_parameters(),
                               lr=args.lr, weight_decay=args.weight_decay)
+    scaler = torch.cuda.amp.GradScaler(enabled=amp)
     total = 10 if args.smoke_test else args.steps
     grad_accum = max(1, args.grad_accum)
     sched = get_cosine_schedule_with_warmup(
@@ -69,9 +72,11 @@ def train(args):
         for batch in iter_batches(blocks, args.batch_size, shuffle=True,
                                   seed=args.seed + opt_step):
             batch = batch.to(device)
-            with torch.no_grad():
-                t_out = teacher(batch, output_hidden_states=True)
-            s_out = student(batch, output_hidden_states=True)
+            with torch.autocast(device_type="cuda", dtype=torch.float16,
+                                enabled=amp):
+                with torch.no_grad():
+                    t_out = teacher(batch, output_hidden_states=True)
+                s_out = student(batch, output_hidden_states=True)
 
             loss_kd = kd_loss(s_out.logits.float(), t_out.logits.float(),
                               args.temperature)
@@ -79,15 +84,17 @@ def train(args):
                                  [h.float() for h in t_out.hidden_states])
             lam = lambda_schedule(opt_step, total, args.max_lambda,
                                   args.lambda_warmup_frac)
+            # consolidation penalty in fp32 (outside autocast)
             loss_c = student.consolidation_penalty() if lam > 0 else 0.0
             loss = loss_kd + args.hidden_weight * loss_h + lam * loss_c
-            (loss / grad_accum).backward()
+            scaler.scale(loss / grad_accum).backward()
             micro += 1
 
             if micro % grad_accum == 0:
+                scaler.unscale_(optim)
                 torch.nn.utils.clip_grad_norm_(student.trainable_parameters(),
                                                args.max_grad_norm)
-                optim.step(); sched.step()
+                scaler.step(optim); scaler.update(); sched.step()
                 optim.zero_grad(set_to_none=True)
                 opt_step += 1
 

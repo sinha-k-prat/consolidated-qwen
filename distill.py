@@ -59,8 +59,13 @@ def hidden_loss(student_hidden, teacher_hidden):
 
 def train(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16 if (args.fp16 and device == "cuda") else torch.float32
-    print(f"[distill] device={device} dtype={dtype} rank={args.rank} "
+    # Master weights are ALWAYS fp32 for numerical stability. --fp16 enables
+    # mixed-precision COMPUTE (autocast to fp16 + GradScaler) on GPU — the stable
+    # way to get fp16 speed/memory. Pure-fp16 MASTER weights make AdamW's state
+    # underflow and the loss go NaN, which is what we hit before.
+    amp = bool(args.fp16 and device == "cuda")
+    dtype = torch.float32
+    print(f"[distill] device={device} amp_fp16={amp} rank={args.rank} "
           f"opt_steps={args.steps} grad_accum={args.grad_accum} "
           f"smoke_test={args.smoke_test}")
 
@@ -89,6 +94,7 @@ def train(args):
     optim = torch.optim.AdamW(
         student.param_groups(args.lr, backbone_lr_mult=args.backbone_lr_mult),
         weight_decay=args.weight_decay)
+    scaler = torch.cuda.amp.GradScaler(enabled=amp)
 
     # NB: args.steps now means OPTIMIZER steps (real weight updates), not
     # micro-batches. One optimizer step = grad_accum micro-batches.
@@ -116,9 +122,12 @@ def train(args):
                                   seed=args.seed + opt_step):
             batch = batch.to(device)
 
-            with torch.no_grad():
-                t_out = teacher(batch, output_hidden_states=True)
-            s_out = student(batch, output_hidden_states=True)
+            # Forward under autocast (fp16 compute when amp); losses in fp32.
+            with torch.autocast(device_type="cuda", dtype=torch.float16,
+                                enabled=amp):
+                with torch.no_grad():
+                    t_out = teacher(batch, output_hidden_states=True)
+                s_out = student(batch, output_hidden_states=True)
 
             loss_kd = kd_loss(s_out.logits.float(), t_out.logits.float(),
                               args.temperature)
@@ -126,14 +135,16 @@ def train(args):
                 [h.float() for h in s_out.hidden_states],
                 [h.float() for h in t_out.hidden_states])
             loss = loss_kd + args.hidden_weight * loss_h
-            (loss / grad_accum).backward()
+            scaler.scale(loss / grad_accum).backward()
             micro += 1
 
             # Only take an optimizer step once grad_accum micro-batches are in.
             if micro % grad_accum == 0:
+                scaler.unscale_(optim)        # unscale before grad clipping
                 torch.nn.utils.clip_grad_norm_(student.trainable_parameters(),
                                                args.max_grad_norm)
-                optim.step()
+                scaler.step(optim)
+                scaler.update()
                 sched.step()
                 optim.zero_grad(set_to_none=True)
                 opt_step += 1

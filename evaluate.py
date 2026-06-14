@@ -151,8 +151,10 @@ def main(args):
         with open(args.results) as f:
             results = json.load(f)
 
+    # fp32 for stable, gold-standard perplexity (size is computed analytically,
+    # so load dtype does not affect the reported GB).
     teacher = AutoModelForCausalLM.from_pretrained(
-        args.model_name, torch_dtype=torch.float16).to(device)
+        args.model_name, torch_dtype=torch.float32).to(device)
     config = teacher.config
 
     # ---- baselines (teacher + 4-bit): compute once, reuse across ranks ----
@@ -184,7 +186,7 @@ def main(args):
         rank = ckpt.get("rank", args.rank)
         student = ConsolidatedQwen(args.model_name, rank=rank,
                                    alpha=ckpt.get("alpha", 16.0),
-                                   dtype=torch.float16).to(device)
+                                   dtype=torch.float32).to(device)
         student.load_consolidated_state_dict(ckpt["state_dict"])
         params, gb, breakdown = student_size(teacher, student, config)
         ppl = perplexity(student, blocks, device, args.eval_batch_size)
