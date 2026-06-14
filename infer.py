@@ -45,9 +45,28 @@ def main(args):
         student, tok = load_local(args.checkpoint, device)
     else:
         raise SystemExit("provide --repo-id or --checkpoint")
+
     print("=" * 60)
+    print("[CONSOLIDATED STUDENT]")
     print(generate(student, tok, args.prompt, args.max_new_tokens,
                    args.temperature, args.top_p))
+
+    # Optional: same prompt through the uncompressed base teacher, to calibrate
+    # expectations — Qwen1.5-0.5B is a small BASE model, so the teacher is also
+    # weak at instruction-style prompts.
+    if args.compare_teacher:
+        from transformers import AutoModelForCausalLM
+        teacher = AutoModelForCausalLM.from_pretrained(
+            args.base_model, torch_dtype=torch.float32).to(device).eval()
+
+        class _W:  # tiny shim so generate()'s `.base.generate` works for teacher
+            pass
+        w = _W(); w.base = teacher
+        w.parameters = teacher.parameters
+        print("-" * 60)
+        print("[TEACHER (uncompressed base)]")
+        print(generate(w, tok, args.prompt, args.max_new_tokens,
+                       args.temperature, args.top_p))
     print("=" * 60)
 
 
@@ -58,8 +77,12 @@ def build_argparser():
     src.add_argument("--checkpoint", help="local consolidated checkpoint")
     ap.add_argument("--prompt", default="The key idea behind weight consolidation is")
     ap.add_argument("--max-new-tokens", type=int, default=128)
-    ap.add_argument("--temperature", type=float, default=0.8)
+    ap.add_argument("--temperature", type=float, default=0.8,
+                    help="0 = greedy (more coherent for weak/POC models)")
     ap.add_argument("--top-p", type=float, default=0.95)
+    ap.add_argument("--compare-teacher", action="store_true",
+                    help="also generate from the uncompressed base teacher")
+    ap.add_argument("--base-model", default="Qwen/Qwen1.5-0.5B")
     ap.add_argument("--token", default=None)
     return ap
 
